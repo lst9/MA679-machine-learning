@@ -1,0 +1,468 @@
+---
+title: "HW2 Classification"
+date: "2/1/2022"
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load("knitr","ggplot2","rstanarm")
+```
+
+## 4.6
+
+### (a)
+
+#### Answer:
+```{r}
+(p <- invlogit(-6+0.05*40+1*3.5))
+```
+
+### (b)
+
+#### Answer:
+```{r}
+(hour <- (logit(0.5)+6-1*3.5)/0.05)
+```
+
+
+## 4.8
+
+#### Answer:
+
+When we use 1-nearest neighbors, the error rate on training set is 0. So, the error rate of 1-NN on test set is 18%*2 = 36%, is bigger than the error rate of logistic classifier on testing set, which is 30%.
+
+The logistic classification is better.
+
+
+## 4.9
+
+### (a)
+
+#### Answer:
+
+```{r}
+(p <- 0.37/1.37)
+```
+
+### (b)
+
+#### Answer:
+
+```{r}
+(odd <- 0.16/(1-0.16))
+```
+
+
+
+## 4.13
+
+### (a)
+
+#### Answer:
+
+```{r}
+library(ISLR2)
+## numeric summary
+summary(Weekly)
+cor(Weekly[,-9])
+## graphic summary
+pairs(Weekly[,-9])
+
+attach(Weekly) #for convenience
+plot(Volume)
+```
+From the summaries of Weekly data, we can see the correlations between today's returns and previous days' returns are small, the only substantial correlation lies on year and volume, what's more, from the plot we can see the volume is increasing over time.
+
+### (b)
+
+#### Answer:
+
+```{r}
+names(Weekly)
+model13.1 <- glm(Direction~Lag1+Lag2+Lag3+Lag4+Lag5+Volume, family = binomial(link = "logit"), data=Weekly)
+summary(model13.1)
+```
+Only coefficient of Lag2 shows significance.
+
+### (c)
+
+#### Answer:
+
+```{r}
+predict13.1 <- predict(model13.1, type = "response")
+
+predglm <- rep("Down",length(predict13.1))
+predglm[predict13.1>0.5] <- "Up"   ###
+##confusion matrix
+table(predglm, Direction)
+##correct prediction
+mean(predglm == Direction)
+```
+The overall percentage of correct prediction is 56%. When market goes up, the true positive rate is 557/(557+48)=92%, when market goes down, the true negative rate is 54/(54+430)=11.1%. So the logistic model predicts more precisely when market goes up.
+
+### (d)
+
+#### Answer:
+```{r}
+##test our model in test set
+
+# traindata <- Weekly[Year<=2008,]
+# testdata <- Weekly[Year>2008,]
+train <- (Year<2009) #Boolean vector, true or false
+Weekly0910 <- Weekly[!train,]
+
+model13.2 <- glm(Direction~Lag2,family = binomial(link = "logit"), data=Weekly, subset = train)
+
+predict13.2 <- predict(model13.2, Weekly0910, type = "response") 
+predglm2 <- rep("Down",length(predict13.2))
+predglm2[predict13.2>0.5] <- "Up"
+Direction0910 <- Direction[!train]
+##confusion matrix
+table(predglm2, Direction0910)
+##correct prediction
+mean(predglm2 == Direction0910)
+```
+The overall percentage of correct prediction is 62.5%. When market goes up, the true positive rate is 56/(56+5)=91.8%, when market goes down, the true negative rate is 9/(9+34)=20.9%. So the logistic model predicts more precisely when market goes up.
+
+### (e)
+
+#### Answer:
+```{r}
+##LDA
+library(MASS)
+fit.lda <- lda(Direction~Lag2, data=Weekly, subset = train)
+#(fit.lda)
+predlda <- predict(fit.lda, Weekly0910)
+#confusion matrix
+table(predlda$class, Direction0910)
+##correct prediction
+mean(predlda$class == Direction0910)
+```
+The prediction by LDA is exactlly same with logistic classification.
+
+### (f)
+
+#### Answer:
+
+```{r}
+##QDA
+fit.qda <- qda(Direction~Lag2, data=Weekly, subset = train)
+
+predqda <- predict(fit.qda, Weekly0910)
+#confusion matrix
+table(predqda$class, Direction0910)
+##correct prediction
+mean(predqda$class == Direction0910)
+```
+The overall percentage of correct prediction is 58.6%. The variance of QDA is bigger than LDA.
+
+### (g)
+
+#### Answer:
+
+```{r}
+## KNN, K=1
+library(class)
+train.x <- as.matrix(Lag2[train])
+test.x <- as.matrix(Lag2[!train])
+train.Direction <- (Direction[train])
+
+set.seed(1)
+predknn <- knn(train.x, test.x, train.Direction, k=1)
+#confusion matrix
+table(predknn, Direction0910)
+##correct prediction
+mean(predknn == Direction0910)
+```
+The overall percentage of correct prediction is 50%. The output is not very good.
+
+### (h)
+
+#### Answer:
+```{r}
+library(e1071)
+fit.nb <- naiveBayes(Direction~Lag2, data = Weekly, subset = train)
+prednb <- predict(fit.nb, Weekly0910)
+table(prednb, Direction0910)
+mean(prednb == Direction0910)
+```
+The overall percentage of correct prediction is 58.65%.
+
+### (i)
+
+#### Answer:
+
+Logistic classification and LDA show best results on this data set.
+
+### (j)
+
+#### Answer:
+```{r}
+##Logistic
+logit <- glm(Direction~Lag2+Lag3,family = binomial(link = "logit"), data=Weekly, subset = train)
+logitpred <- predict(logit, Weekly0910, type = "response") 
+predlogit <- rep("Down",length(logitpred))
+predlogit[logitpred>0.5] <- "Up"
+mean(predlogit == Direction0910)
+##LDA
+lda <- lda(Direction~Lag2+Lag3, data = Weekly, subset = train)
+ldapred <- predict(lda, Weekly0910)
+mean(ldapred$class == Direction0910)
+##QDA
+qda <- qda(Direction~Lag1+Lag3, data = Weekly, subset = train)
+qdapred <- predict(qda, Weekly0910)
+mean(qdapred$class == Direction0910)
+##KNN
+set.seed(1)
+knnpred <- knn(train.x, test.x, train.Direction, k = 4)
+mean(knnpred == Direction0910)
+##naive bayes
+nb <- naiveBayes(Direction~Lag2+Lag3, data = Weekly, subset = train)
+nbpred <- predict(nb, Weekly0910)
+mean(nbpred == Direction0910)
+```
+For logistic and LDA, best predictors are lag2 and lag3
+
+For QDA, best predictors are lag1 and lag3
+
+For KNN, best k is 4
+
+For naive bayes, best predictors are lag2 and lag3
+
+
+## 4.14
+
+### (a)
+
+#### Answer:
+```{r}
+library(ISLR2)
+#summary(Auto)
+attach(Auto)
+mpg01 <- rep(0,length(mpg))
+mpg01[mpg>median(mpg)] <- 1
+data <- data.frame(mpg01,Auto)
+```
+
+### (b)
+
+#### Answer:
+```{r}
+##scatter plot
+pairs(data)
+cor(data[,-10])
+##boxplot
+boxplot(cylinders~mpg01)
+boxplot(displacement~mpg01)
+boxplot(horsepower~mpg01)
+boxplot(weight~mpg01)
+boxplot(acceleration~mpg01) #small
+boxplot(year~mpg01)
+boxplot(origin~mpg01)
+```
+cylinders, displacement, horsepower, weight.
+
+### (c)
+
+#### Answer:
+```{r}
+train <- (year<79)
+data.train <- data[train,]
+data.test <- data[!train,]
+
+mpg01.test <- mpg01[!train]
+```
+
+### (d) LDA
+
+#### Answer:
+```{r}
+fit14.lda <- lda(mpg01~cylinders+displacement+horsepower+weight, data = data.train)
+pred14.lda <- predict(fit14.lda, data.test)
+mean(pred14.lda$class != mpg01.test)
+```
+The test error is 14.9%.
+
+### (e) QDA
+
+#### Answer:
+```{r}
+fit14.qda <- qda(mpg01~cylinders+displacement+horsepower+weight, data = data.train)
+pred14.qda <- predict(fit14.qda, data.test)
+mean(pred14.qda$class != mpg01.test)
+```
+The test error is 17.5%.
+
+### (f) Logistic
+
+#### Answer:
+```{r}
+fit14.logit <- glm(mpg01~cylinders+displacement+horsepower+weight, family=binomial, data = data.train)
+pred14.prob <- predict(fit14.logit, data.test)
+pred14.logit <- rep(0, length(pred14.prob))
+pred14.logit[pred14.prob>0.5] <- 1
+mean(pred14.logit != mpg01.test)
+```
+The test error is 27.2%.
+
+### (g) Naive Bayes
+
+#### Answer:
+```{r}
+fit14.nb <- naiveBayes(mpg01~cylinders+displacement+horsepower+weight, data = data.train)
+pred14.nb <- predict(fit14.nb, data.test)
+mean(pred14.nb != mpg01.test)
+```
+The test error is 13.16%.
+
+### (h) KNN
+
+#### Answer:
+```{r}
+train14.x <- cbind(cylinders,displacement,horsepower,weight)[train,]
+test14.x <- cbind(cylinders,displacement,horsepower,weight)[!train,]
+mpg01.train <- mpg01[train]
+
+set.seed(1)
+pred14.knn <- knn(train14.x, test14.x, mpg01.train, k=30)
+mean(pred14.knn != mpg01.test)
+```
+The best K is 30, test error is 17.5%.
+
+
+## 4.15
+
+### (a)
+
+#### Answer:
+```{r}
+power <- function(){print(2^3)}
+power()
+```
+
+### (b)
+
+#### Answer:
+```{r}
+power2 <- function(x,a){print(x^a)}
+power2(2,3)
+```
+
+### (c)
+
+#### Answer:
+```{r}
+power2(10,3)
+power2(8,17)
+power2(131,3)
+```
+
+### (d)
+
+#### Answer:
+```{r}
+power3 <- function(x,a){
+  result <- x^a
+  return(result)
+  }
+power3(2,3)
+```
+
+### (e)
+
+#### Answer:
+```{r}
+x <- c(1:10)
+plot(x, power3(x,2), log = "xy", xlab = "log of x", ylab = "log of x^2", main = "log(x^2)~log(x)")
+```
+
+### (f)
+
+#### Answer:
+```{r}
+PlotPower <- function(x,a){
+  y <- power3(x,a)
+  plot(x,y,log = "xy")
+}
+PlotPower(1:10, 3)
+```
+
+
+## 4.16
+
+#### Answer:
+```{r}
+summary(Boston)
+attach(Boston)
+crim01 <- rep(0,length(crim))
+crim01[crim>median(crim)] <- 1
+Boston <- cbind(Boston,crim01)
+#test correlation
+cor(Boston)
+```
+The nox, dis, rad, age, tax, indus are predictors most associate with probability of crime.
+
+```{r}
+train <- 1:400
+test <- 401:dim(Boston)[1]
+Boston.train <- Boston[train,]
+Boston.test <- Boston[test,]
+crim01.train <- crim01[train]
+crim01.test <- crim01[test]
+```
+
+```{r}
+##LDA
+fit16.lda <- lda(crim01~rad, data=Boston.train)
+pred16.lda <- predict(fit16.lda, Boston.test)
+mean(pred16.lda$class != crim01.test) #error rate 2.83%
+
+fit16.lda1 <- lda(crim01~rad+nox, data=Boston.train)
+pred16.lda1 <- predict(fit16.lda1, Boston.test)
+mean(pred16.lda1$class != crim01.test) #error rate increases
+#add any other predictors, error rate doesn't decrease
+```
+For LDA, when only use rad, model has lowest error rate, 2.83%.
+
+```{r}
+##Logistic
+fit16.logit <- glm(crim01~rad, data=Boston.train, family = binomial)
+pred16.prob <- predict(fit16.logit, Boston.test)
+pred16.logit <- rep(0, length(pred16.prob))
+pred16.logit[pred16.prob>0.5] <- 1
+mean(pred16.logit != crim01.test) 
+```
+Similarly with LDA, when only use rad, model has lowest error rate, 2.83%.
+
+```{r}
+##Naive Bayes
+fit16.nb <- naiveBayes(crim01~rad, data=Boston.train)
+pred16.nb <- predict(fit16.nb, Boston.test)
+mean(pred16.nb != crim01.test) 
+
+fit16.nb1 <- naiveBayes(crim01~rad+indus, data=Boston.train)
+pred16.nb1 <- predict(fit16.nb1, Boston.test)
+mean(pred16.nb1 != crim01.test) 
+```
+For Naive Bayes, when only use rad, model has lowest error rate, 2.83%.
+
+Add any other predictors, error rate doesn't decrease.
+
+```{r}
+##KNN
+train16.x <- as.matrix(rad[train])
+test16.x <- as.matrix(rad[test])
+set.seed(1)
+pred16.knn <- knn(train16.x, test16.x, crim01.train, k=200)
+mean(pred16.knn != crim01.test)
+
+train16.x1 <- cbind(rad,nox)[train,]
+test16.x1 <- cbind(rad,nox)[test,]
+set.seed(1)
+pred16.knn1 <- knn(train16.x1, test16.x1, crim01.train, k=100)
+mean(pred16.knn1 != crim01.test)
+```
+For any K<200, the error rate of KNN with only one predictor "rad" remain constant 2.83%.
