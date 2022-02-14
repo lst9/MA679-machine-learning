@@ -1,0 +1,406 @@
+---
+title: "HW3-resampling+model selection-Shuting Li"
+author: "Shuting"
+date: "2/10/2022"
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 5.8
+
+### (a)
+
+#### Answer:
+```{r}
+set.seed(1)
+x <- rnorm(100)
+y <- x - 2 * x^2 + rnorm(100)
+```
+n is 100, p is 2. Model is $$ y=x-2x^2+\epsilon $$
+
+### (b)
+
+#### Answer:
+```{r}
+plot(x,y)
+```
+It is quadratic plot, points concentrate on middle.
+
+### (c)
+
+#### Answer:
+```{r}
+library(boot)
+Data <- data.frame(x, y)
+
+set.seed(1)
+glm.fit.i = glm(y ~ x)
+cv.glm(Data, glm.fit.i)$delta[1]
+
+glm.fit.ii = glm(y ~ poly(x,2))
+cv.glm(Data, glm.fit.ii)$delta[1]
+
+glm.fit.iii = glm(y ~ poly(x,3))
+cv.glm(Data, glm.fit.iii)$delta[1]
+
+glm.fit.iv = glm(y ~ poly(x,4))
+cv.glm(Data, glm.fit.iv)$delta[1]
+```
+
+### (d)
+
+#### Answer:
+```{r}
+set.seed(2)
+glm.fit.i = glm(y ~ x)
+cv.glm(Data, glm.fit.i)$delta[1]
+
+glm.fit.ii = glm(y ~ poly(x,2))
+cv.glm(Data, glm.fit.ii)$delta[1]
+
+glm.fit.iii = glm(y ~ poly(x,3))
+cv.glm(Data, glm.fit.iii)$delta[1]
+
+glm.fit.iv = glm(y ~ poly(x,4))
+cv.glm(Data, glm.fit.iv)$delta[1]
+```
+Exactly same with the output in (c). Because repeat LOOCV will not change the way to split test data.
+
+### (e)
+
+#### Answer:
+
+Second model has the smallest error, it exactly is what we expected, because it has x and x^2 as predictors, same with the true model of data.
+
+### (f)
+
+#### Answer:
+```{r}
+summary(glm.fit.iv)
+```
+The p-value of x^3 and x^4 are not significant, so we believe x^3 and x^4 not have much influence on y. It agrees with the CV results.
+
+
+## 6.2
+
+### (a)
+
+#### Answer:
+
+For lasso, iii is right, because it adds penalty term which decreases the flexibility.
+
+iii. Less flexible and hence will give improved prediction accuracy when its increase in bias is less than its decrease in variance.
+
+### (b)
+
+#### Answer:
+
+For ridge, iii is right, because it adds penalty term which decreases the flexibility.
+
+### (c)
+
+#### Answer:
+
+For no-linear model, ii is right, because it allows power term of the model, like quadratic term, increases the flexibility.
+
+ii. More flexible and hence will give improved prediction accu- racy when its increase in variance is less than its decrease in bias.
+
+
+## 6.9
+
+### (a)
+
+#### Answer:
+```{r}
+library(ISLR2)
+sum(is.na(College))
+#dim(College)
+set.seed(1)
+train <- sample(1:777, 380,replace = FALSE)
+College.train <- College[train,]
+College.test <- College[-train,]
+```
+
+### (b)
+
+#### Answer:
+```{r}
+lm.fit <- lm(Apps~.,data=College.train)
+lm.pred <- predict(lm.fit, newdata = College.test)
+(lm.testerror <- mean((College.test$Apps-lm.pred)^2))
+```
+
+### (c)
+
+#### Answer:
+```{r}
+library(glmnet)
+
+x.train.mat = model.matrix(Apps~., data=College.train)[,-1]
+x.test.mat = model.matrix(Apps~., data=College.test)[,-1]
+y.train = College.train$Apps
+y.test = College.test$Apps
+
+grid = 10 ^ seq(4, -4, length=100)
+set.seed(2)
+ridge.cv = cv.glmnet(x.train.mat, y.train, alpha=0, lambda = grid) # if do not set grid, lambda is not small enough
+#plot(ridge.cv)
+(lambda.best = ridge.cv$lambda.min)
+
+ridge.mod <- glmnet(x.train.mat, y.train, alpha=0)
+ridge.pred <- predict(ridge.mod, newx=x.test.mat, s=lambda.best)
+(ridge.testerror <- mean((y.test - ridge.pred)^2))
+```
+Best lambda is 1e-04, test error is 967992.5.
+
+### (d)
+
+#### Answer:
+```{r}
+set.seed(2)
+lasso.cv = cv.glmnet(x.train.mat, y.train, alpha=1)
+plot(lasso.cv)
+(lambda.best = lasso.cv$lambda.min)
+#########predict######
+lasso.mod <- glmnet(x.train.mat, y.train, alpha=1)
+lasso.pred <- predict(lasso.mod, newx=x.test.mat, s=lambda.best)
+(lasso.testerror <- mean((y.test - lasso.pred)^2))
+#########coefficient######
+x <- model.matrix(Apps~.,College)[,-1]
+y <- College$Apps
+out <- glmnet(x,y,alpha = 1)
+lasso.coef <- predict(out,s=lambda.best,type = "coefficients")
+```
+The test error is 1108793, number of non-zero coefficient is 18.
+
+### (e)
+
+#### Answer:
+```{r}
+library(pls)
+pcr.fit = pcr(Apps~., data=College.train, scale=T, validation="CV")
+#summary(pcr.fit)
+validationplot(pcr.fit, val.type="MSEP")
+pcr.pred = predict(pcr.fit, College.test, ncomp=10)
+(pcr.testerror <- mean((y.test - pcr.pred)^2))
+```
+The test error is 1711146.
+
+### (f)
+
+#### Answer:
+```{r}
+pls.fit = plsr(Apps~., data=College.train, scale=T, validation="CV")
+validationplot(pls.fit, val.type="MSEP")
+#summary(pls.fit)
+validationplot(pls.fit, val.type="MSEP")
+pls.pred = predict(pls.fit, College.test, ncomp=15)
+(pls.testerror <- mean((y.test - pls.pred)^2))
+```
+The test error is 1129734.
+
+### (g)
+
+#### Answer:
+```{r}
+tss <- mean((y.test-mean(y.test))^2)
+(lm.r2 <- 1-lm.testerror/tss)
+(ridge.r2 <- 1-ridge.testerror/tss)
+(lasso.r2 <- 1-lasso.testerror/tss)
+(pcr.r2 <- 1-pcr.testerror/tss)
+(pls.r2 <- 1-pls.testerror/tss)
+```
+There is no much difference between these approaches.
+
+
+## 6.10
+
+### (a)
+
+#### Answer:
+```{r}
+set.seed(1)
+p = 20
+n = 1000
+x = matrix(rnorm(n * p), n, p)
+beta = sample(1:100,p)
+beta[c(5,7,10)] = 0
+eps = rnorm(p)
+y = x %*% beta + eps
+```
+
+### (b)
+
+#### Answer:
+```{r}
+set.seed(1)
+train <- sample(1:1000,100,replace = FALSE)
+data <- data.frame(x,y)
+train.data <- data[train,]
+test.data <- data[-train,]
+```
+
+### (c)
+
+#### Answer:
+```{r}
+library(leaps)
+regfit.full = regsubsets(y ~ ., data = train.data, nvmax = p)
+reg.summary <- summary(regfit.full)
+plot(reg.summary$rss/1000,xlab="number of variables",ylab="training MSE")
+minnum <- which.min(reg.summary$bic)
+coef(regfit.full,18)
+```
+
+### (d)
+
+#### Answer:
+```{r}
+val.error <- rep(NA,20)
+test.mat <- model.matrix(y ~ ., data = test.data)
+for (i in 1:20){
+  coefi <- coef(regfit.full, id=i)
+  pred=test.mat[,names(coefi)]%*%coefi
+  val.error[i] <- mean((test.data$y-pred)^2)
+}
+minnum <- which.min(val.error)
+mincoef <- coef(regfit.full,17)
+plot(val.error,xlab="number of variables",ylab="testing MSE")
+```
+
+### (e)
+
+#### Answer:
+```{r}
+which.min(val.error)
+```
+Testing MSE will be minimum when model takes 17 coefficients. It agrees with the true form of data.
+
+### (f)
+
+#### Answer:
+```{r}
+coef(regfit.full,17)
+```
+The model with smallest test MSE has coefficients that similar to the true model.
+
+### (g)
+
+#### Answer:
+```{r}
+coef.error <- rep(NA,20)
+names(beta) <- paste0('X', 1:20)
+for (r in 1:20){
+  coefr <- coef(regfit.full, id=r)
+  coef.error[r] <- sqrt(sum((beta[names(beta) %in% names(coefr)]-coefr[names(coefr) %in% names(beta)])^2)+sum((beta[!(names(beta) %in% names(coefr))])^2))
+}
+
+plot(coef.error,xlab="number of variables",ylab="error between estimated and true coefficients")
+```
+When number of variables increases, the estimated coefficients close into the true value, bias decreases.
+
+In (d), when number of variables bigger than 17, the testing MSE increases, which means the amount of variance increases bigger than bias decreases.
+
+
+## 6.11
+
+### (a)
+
+#### Answer:
+```{r}
+library(MASS)
+library(leaps)
+library(glmnet)
+library(pls)
+
+predict.regsubsets = function(object, newdata, id, ...) {
+    form = as.formula(object$call[[2]])
+    mat = model.matrix(form, newdata)
+    coefi = coef(object, id = id)
+    mat[, names(coefi)] %*% coefi
+}
+#### test MSE with 10-fold in different subset selection #####
+k = 10
+p = ncol(Boston) - 1
+folds = sample(rep(1:k, length = nrow(Boston)))
+cv.errors = matrix(NA, k, p)
+for (i in 1:k) {
+    best.fit = regsubsets(crim ~ ., data = Boston[folds != i, ], nvmax = p)
+    for (j in 1:p) {
+        pred = predict(best.fit, Boston[folds == i, ], id = j)
+        cv.errors[i, j] = mean((Boston$crim[folds == i] - pred)^2)
+    }
+}
+rmse.cv = (apply(cv.errors, 2, mean))
+plot(rmse.cv, type = "b",xlab="number of variables",ylab="testing MSE")
+
+which.min(rmse.cv)
+(rmse.error <- rmse.cv[9])
+```
+
+```{r}
+##ridge
+x = model.matrix(crim ~ . - 1, data = Boston)
+y = Boston$crim
+set.seed(1)
+train <- sample(1:506,400,replace = FALSE)
+
+cv.ridge = cv.glmnet(x[train,], y[train], type.measure = "mse", alpha = 0)
+plot(cv.ridge)
+bestlam <- cv.ridge$lambda.min
+
+ridge.mod = glmnet(x[train,], y[train], alpha = 0)
+ridge.pred <- predict(ridge.mod, s=bestlam, newx = x[-train,])
+(ridge.error <- mean((ridge.pred-y[-train])^2))
+```
+
+```{r}
+##lasso
+cv.lasso = cv.glmnet(x[train,], y[train], type.measure = "mse", alpha = 1)
+plot(cv.lasso)
+bestlam <- cv.lasso$lambda.min
+
+lasso.mod = glmnet(x[train,], y[train], alpha = 1)
+lasso.pred <- predict(lasso.mod, s=bestlam, newx = x[-train,])
+(lasso.error <- mean((lasso.pred-y[-train])^2))
+```
+
+```{r}
+##pcr
+pcr.fit = pcr(crim ~ ., data = Boston, scale = TRUE, subset=train, validation = "CV")
+#summary(pcr.fit) #13 comps
+pcr.pred = predict(pcr.fit, x[-train,],ncomp=13)
+(pcr.error = mean((pcr.pred-y[-train])^2))
+```
+Subset selection with 9 components has lowest testing MSE.
+
+## (b)
+
+#### Answer:
+```{r}
+k = 10
+p = ncol(Boston) - 1
+folds = sample(rep(1:k, length = nrow(Boston)))
+cv.errors = matrix(NA, k, p)
+for (i in 1:k) {
+    best.fit = regsubsets(crim ~ ., data = Boston[folds != i, ], nvmax = p)
+    for (j in 1:p) {
+        pred = predict(best.fit, Boston[folds == i, ], id = j)
+        cv.errors[i, j] = mean((Boston$crim[folds == i] - pred)^2)
+    }
+}
+rmse.cv = (apply(cv.errors, 2, mean))
+(rmse.error <- rmse.cv[9])
+```
+When we use subset selection model with 9 components we will get lowest testing MSE.
+
+## (c)
+
+#### Answer:
+
+The model I chose only involve 9 features, because it shows lowest testing MSE.
